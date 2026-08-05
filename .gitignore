@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# Xcode user settings
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Build files
+build/
+DerivedData/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode generated files
+*.xccheckout
+*.moved-aside
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Sensitive configuration files
+*.env
+.env
+.env.*
+Secrets.swift
+Config.xcconfig
