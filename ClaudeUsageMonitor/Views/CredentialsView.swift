@@ -7,9 +7,8 @@ struct CredentialsView: View {
     @Binding var orgId: String
 
     var body: some View {
+        // No heading here: the enclosing DisclosureGroup already provides one.
         VStack(alignment: .leading, spacing: 6) {
-            Text("Credentials").font(.caption).bold()
-
             SecureField("sessionKey (sk-ant-...)", text: $sessionKey)
                 .textFieldStyle(.roundedBorder)
 

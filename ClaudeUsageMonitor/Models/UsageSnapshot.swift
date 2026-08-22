@@ -176,9 +176,22 @@ enum Timestamp {
         return iso8601WithFractionalSeconds.date(from: string) ?? iso8601.date(from: string)
     }
 
+    private static let relative: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+
     static func short(_ date: Date?) -> String {
         guard let date else { return "N/A" }
         return shortDateTime.string(from: date)
+    }
+
+    /// "2 min ago", "in 3 min". Used for the freshness line in the popover,
+    /// where the exact clock time matters less than how stale the data is.
+    static func relative(_ date: Date?, to reference: Date = Date()) -> String {
+        guard let date else { return "never" }
+        return relative.localizedString(for: date, relativeTo: reference)
     }
 
     static func medium(_ date: Date?) -> String {

@@ -93,6 +93,37 @@ final class UsageViewModel {
             && !orgId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Builds a view model pinned to a given state, touching neither the
+    /// Keychain nor the network and never starting the poll loop.
+    ///
+    /// Exists so each popover state can be rendered — in Xcode previews and in
+    /// offscreen snapshots — without a live account. States such as "Cloudflare
+    /// is challenging you" or "this plan reports no Opus quota" are otherwise
+    /// close to impossible to reach deliberately.
+    static func preview(
+        _ state: LoadState,
+        sessionKey: String = "sk-ant-sid01-preview",
+        orgId: String = "00000000-0000-4000-8000-000000000000",
+        nextRefreshAt: Date? = nil
+    ) -> UsageViewModel {
+        let model = UsageViewModel(previewing: state, sessionKey: sessionKey, orgId: orgId)
+        model.nextRefreshAt = nextRefreshAt
+        return model
+    }
+
+    private init(previewing state: LoadState, sessionKey: String, orgId: String) {
+        // An isolated defaults suite so a preview cannot disturb real settings.
+        self.credentials = CredentialStore(service: "preview.ClaudeUsageMonitor",
+                                           defaults: UserDefaults(suiteName: "preview.ClaudeUsageMonitor") ?? .standard)
+        self.defaults = UserDefaults(suiteName: "preview.ClaudeUsageMonitor") ?? .standard
+        self.client = UsageAPIClient()
+        self.sessionKey = sessionKey
+        self.cfClearance = ""
+        self.orgId = orgId
+        self.state = state
+        // Deliberately no startPolling().
+    }
+
     // MARK: - Polling
 
     /// Starts (or restarts) the refresh loop, fetching immediately.
