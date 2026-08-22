@@ -147,8 +147,31 @@ panel instead of 500pt of mostly empty space.
 > A first attempt measured content with a `GeometryReader` and fed the result
 > back into the frame. That is circular and collapsed to 1pt before the first
 > layout pass. Caught by rendering it to a PNG and looking, not by reading it.
-> A `ScrollView` already reports its content's ideal size, so `.frame(maxHeight:)`
-> alone does the job.
+
+> **Correction.** The entry that replaced it claimed a `ScrollView` reports its
+> content's ideal size, so `.frame(maxHeight:)` alone was enough. That is false,
+> and it shipped: the popover opened as a 300x10 sliver showing nothing.
+>
+> `MenuBarExtra(.window)` sizes its panel by asking the content what size it
+> wants with nothing imposed. A `ScrollView` does not pass its content's ideal
+> height through that question — it answers with a fixed 10pt. `maxHeight` then
+> clamps a number that never arrives. Measured through the hosting path
+> `MenuBarExtra` uses, the old view returned the *same* size for every state:
+> 300x0 for an unspecified proposal, 300x560 for an unbounded one. Content
+> played no part in it.
+>
+> The height is now measured and applied explicitly, via a preference key. That
+> is not a return to the circular version above: this reading is taken from the
+> content *inside* the scroll view, where the vertical proposal is unbounded,
+> and applied to the scroll view *around* it, so the measurement does not depend
+> on the frame it sets.
+>
+> The process lesson: `./Tools/render-snapshots.sh` could never have caught
+> this. It renders `PopoverContent`, not `PopoverView`, so panel sizing was
+> never under test — and `ImageRenderer` proposes a concrete size anyway, which
+> is the one thing that hides this bug. "Look at the PNGs" is necessary but not
+> sufficient; a view that only misbehaves when asked for its *ideal* size has to
+> be measured in the layout context that asks.
 
 **Only the quotas the account reports are shown**, with an explicit empty state
 when a successful response carries no quota data. Plans differ in what they

@@ -8,22 +8,36 @@ struct PopoverView: View {
     /// Beyond this the content scrolls rather than growing a taller panel.
     private static let maximumHeight: CGFloat = 560
     private static let width: CGFloat = 300
+    /// Used for the single layout pass before the content has been measured.
+    /// Roughly a loaded popover; any error is corrected on the next pass.
+    private static let unmeasuredHeight: CGFloat = 240
 
     @State private var showCredentials = false
     /// Drives the "updated 2 min ago" line without waiting for a refresh.
     @State private var now = Date()
+    /// The content's ideal height, measured inside the scroll view.
+    @State private var contentHeight: CGFloat = 0
 
     private let clock = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
 
     /// The panel sizes itself to its content, up to `maximumHeight`.
     ///
-    /// The previous implementation hard-coded a height, which left a large
-    /// empty area for accounts reporting only one or two quotas. A
-    /// `ScrollView` reports its content's ideal size as its own, so capping it
-    /// with `maxHeight` is enough: short content yields a short panel, and only
-    /// content past the cap starts scrolling. Measuring the content with a
-    /// `GeometryReader` and feeding that back into the frame would be circular,
-    /// and collapses to zero height before the first layout pass.
+    /// `MenuBarExtra(.window)` sizes its panel by proposing `nil` height and
+    /// taking whatever the content calls ideal. A `ScrollView` answers that
+    /// proposal with a fixed 10pt — it does *not* pass its content's ideal
+    /// height through — so `.frame(maxHeight:)` alone clamps a number that
+    /// never arrives and the panel renders as a 300x10 sliver. An earlier
+    /// version shipped exactly that. It was invisible to
+    /// `Tools/render-snapshots.sh` because `ImageRenderer` proposes a concrete
+    /// size, so the failing path was never exercised.
+    ///
+    /// So the height is measured and applied explicitly. This is not the
+    /// circular measurement that collapsed to 1pt during the refactor: that one
+    /// fed a `GeometryReader` reading of a view back into *that same view's*
+    /// frame. Here the reading is taken from the content *inside* the scroll
+    /// view, where the vertical proposal is unbounded, and applied to the
+    /// scroll view *around* it. The measurement therefore does not depend on
+    /// the frame it sets, and settles in one pass.
     var body: some View {
         ScrollView {
             PopoverContent(
@@ -32,14 +46,33 @@ struct PopoverView: View {
                 now: now,
                 width: Self.width
             )
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                }
+            )
         }
-        .frame(width: Self.width)
-        .frame(maxHeight: Self.maximumHeight)
+        .frame(width: Self.width, height: panelHeight)
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
         .onReceive(clock) { now = $0 }
         .task {
             showCredentials = !manager.hasCredentials
             await manager.refreshIfStale()
         }
+    }
+
+    private var panelHeight: CGFloat {
+        guard contentHeight > 0 else { return Self.unmeasuredHeight }
+        return min(contentHeight, Self.maximumHeight)
+    }
+}
+
+/// Carries the measured height of the popover's content out to the scroll view
+/// that wraps it.
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
