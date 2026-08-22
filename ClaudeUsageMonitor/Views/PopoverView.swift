@@ -23,7 +23,7 @@ struct PopoverView: View {
 
                 HStack {
                     Button("Refresh") {
-                        Task { await manager.fetchUsage() }
+                        manager.refreshNow()
                     }
                     Spacer()
                     Button("Quit") {
@@ -34,8 +34,8 @@ struct PopoverView: View {
             .padding(12)
         }
         .frame(width: 300, height: 500)
-        .onAppear {
-            Task { await manager.fetchUsage() }
+        .task {
+            await manager.refreshIfStale()
         }
     }
 

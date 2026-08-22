@@ -66,6 +66,22 @@ struct UsageAPIClient {
             throw UsageError.malformedResponse
         }
 
+        if http.statusCode != 200 {
+            // The endpoint is undocumented, so when it refuses a request the
+            // shape of that refusal is the only evidence available for
+            // diagnosing it. Status, content type, size and the challenge
+            // verdict are recorded; the body itself is not, since an error
+            // payload may echo account details.
+            let contentType = http.value(forHTTPHeaderField: "Content-Type") ?? "(none)"
+            let isChallenge = Self.isCloudflareChallenge(data: data, response: http)
+            Self.logger.notice("""
+                HTTP \(http.statusCode, privacy: .public) \
+                content-type=\(contentType, privacy: .public) \
+                bytes=\(data.count, privacy: .public) \
+                cloudflareChallenge=\(isChallenge, privacy: .public)
+                """)
+        }
+
         switch http.statusCode {
         case 200:
             do {
@@ -84,12 +100,27 @@ struct UsageAPIClient {
             throw UsageError.sessionExpired
 
         case 403:
-            // The important distinction: a Cloudflare challenge tells the user
-            // to fetch a cf_clearance cookie, a bare 403 tells them their
-            // account cannot read this organisation. Both arrive as 403.
-            throw Self.isCloudflareChallenge(data: data, response: http)
-                ? UsageError.cloudflareChallenge
-                : UsageError.insufficientPermissions
+            // Three different situations arrive as 403 and need three
+            // different responses from the user:
+            //
+            //   1. A Cloudflare challenge page  -> supply cf_clearance
+            //   2. error_code account_session_invalid -> refresh sessionKey
+            //   3. anything else -> the account genuinely lacks permission
+            //
+            // An expired session cookie is case 2, NOT 401 as one would
+            // expect. Verified against the live endpoint.
+            if Self.isCloudflareChallenge(data: data, response: http) {
+                throw UsageError.cloudflareChallenge
+            }
+            if let apiError = APIErrorResponse.decoded(from: data) {
+                if apiError.indicatesInvalidSession {
+                    throw UsageError.sessionExpired
+                }
+                if let message = apiError.userFacingMessage {
+                    throw UsageError.api(message: message)
+                }
+            }
+            throw UsageError.insufficientPermissions
 
         case 404:
             throw UsageError.organizationNotFound

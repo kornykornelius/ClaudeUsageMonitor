@@ -66,6 +66,9 @@ enum UsageError: Error, Equatable {
     case timedOut
     /// A 200 whose body could not be decoded as the expected JSON.
     case malformedResponse
+    /// A structured error from claude.ai that we do not specifically
+    /// recognise. The server's own wording is shown rather than a guess.
+    case api(message: String)
 
     /// Short line for the menu bar and the top of the popover.
     var title: String {
@@ -80,6 +83,7 @@ enum UsageError: Error, Equatable {
         case .offline: "Offline"
         case .timedOut: "Request Timed Out"
         case .malformedResponse: "Unexpected Response"
+        case .api: "claude.ai Error"
         }
     }
 
@@ -110,6 +114,8 @@ enum UsageError: Error, Equatable {
             "claude.ai did not respond in time. The app will retry."
         case .malformedResponse:
             "claude.ai returned data in an unexpected format. The endpoint is undocumented and may have changed."
+        case .api(let message):
+            message
         }
     }
 
@@ -119,7 +125,7 @@ enum UsageError: Error, Equatable {
         switch self {
         case .rateLimited, .server, .offline, .timedOut: true
         case .invalidOrganizationID, .sessionExpired, .cloudflareChallenge,
-             .insufficientPermissions, .organizationNotFound, .malformedResponse: false
+             .insufficientPermissions, .organizationNotFound, .malformedResponse, .api: false
         }
     }
 }
