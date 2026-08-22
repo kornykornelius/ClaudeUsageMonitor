@@ -11,15 +11,22 @@ struct ClaudeUsageMonitorApp: App {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "brain.head.profile")
-                if let fiveHour = manager.usageData?.fiveHour {
-                    let val = fiveHour.utilization
-                    let pct = val <= 1.0 ? Int(val * 100) : Int(min(val, 100))
-                    Text("\(pct)%")
-                } else {
-                    Text("Claude")
-                }
+                Text(label)
             }
         }
         .menuBarExtraStyle(.window)
+    }
+
+    /// The 5-hour session percentage is the number worth glancing at, so it is
+    /// what the menu bar shows. Anything else collapses to a short word — the
+    /// menu bar is not the place for an error message.
+    private var label: String {
+        if let fiveHour = manager.state.snapshot?.quotas.first(where: { $0.kind == .fiveHour }) {
+            return "\(fiveHour.percentage.value)%"
+        }
+        if manager.state.error != nil {
+            return "!"
+        }
+        return "Claude"
     }
 }

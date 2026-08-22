@@ -13,9 +13,8 @@ import Observation
 @MainActor
 @Observable
 final class UsageViewModel {
-    private(set) var usageData: UsageResponse?
-    private(set) var statusText: String = "Loading..."
-    private(set) var isLoading: Bool = false
+    /// The single source of truth for what the popover shows.
+    private(set) var state: LoadState = .needsSetup
 
     /// claude.ai session cookie. Written straight through to the Keychain.
     var sessionKey: String {
@@ -38,11 +37,17 @@ final class UsageViewModel {
 
     private let credentials: CredentialStore
     private let defaults: UserDefaults
+    private let client: UsageAPIClient
     private var timer: Timer?
 
-    init(credentials: CredentialStore = CredentialStore(), defaults: UserDefaults = .standard) {
+    init(
+        credentials: CredentialStore = CredentialStore(),
+        defaults: UserDefaults = .standard,
+        client: UsageAPIClient = UsageAPIClient()
+    ) {
         self.credentials = credentials
         self.defaults = defaults
+        self.client = client
 
         // Runs before the credentials are read below, so a value migrated out
         // of UserDefaults on this launch is picked up immediately.
@@ -54,65 +59,53 @@ final class UsageViewModel {
         self.cfClearance = credentials.value(for: .cfClearance)
         self.orgId = defaults.string(forKey: Self.orgIdDefaultsKey) ?? ""
 
+        if !hasCredentials {
+            self.state = .needsSetup
+        }
+
         startTimer()
+    }
+
+    var hasCredentials: Bool {
+        !sessionKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !orgId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     func startTimer() {
         timer?.invalidate()
-        // Automatically fetches updates every 3 minutes
+        // Automatically fetches updates every 3 minutes.
+        // Phase 4 replaces this with a Task-based loop that survives menu
+        // tracking and backs off when requests fail.
         timer = Timer.scheduledTimer(withTimeInterval: 180, repeats: true) { [weak self] _ in
             Task { await self?.fetchUsage() }
         }
     }
 
     func fetchUsage() async {
-        let cleanKey = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanOrg = orgId.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanClearance = cfClearance.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !cleanKey.isEmpty, !cleanOrg.isEmpty else {
-            self.statusText = "Setup Required"
+        guard hasCredentials else {
+            state = .needsSetup
             return
         }
 
-        guard let url = URL(string: "https://claude.ai/api/organizations/\(cleanOrg)/usage") else {
-            self.statusText = "Invalid URL / Org ID"
-            return
+        // Keep showing the previous snapshot while refreshing, so the popover
+        // does not blank out on every poll.
+        if let existing = state.snapshot {
+            state = .refreshing(existing, fetchedAt: Date())
+        } else {
+            state = .loading
         }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 15
-
-        // Full browser headers to pass Cloudflare checks
-        var cookies = ["sessionKey=\(cleanKey)"]
-        if !cleanClearance.isEmpty {
-            cookies.append("cf_clearance=\(cleanClearance)")
-        }
-        request.setValue(cookies.joined(separator: "; "), forHTTPHeaderField: "Cookie")
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("https://claude.ai", forHTTPHeaderField: "Referer")
-        request.setValue("same-origin", forHTTPHeaderField: "Sec-Fetch-Site")
-
-        self.isLoading = true
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            self.isLoading = false
-
-            if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode == 200 {
-                    let decoder = JSONDecoder()
-                    self.usageData = try decoder.decode(UsageResponse.self, from: data)
-                    self.statusText = "Updated"
-                } else {
-                    self.statusText = "HTTP Error \(httpResponse.statusCode) (Check Credentials)"
-                }
-            }
+            let snapshot = try await client.fetchUsage(
+                orgId: orgId,
+                sessionKey: sessionKey,
+                cfClearance: cfClearance
+            )
+            state = .loaded(snapshot, fetchedAt: Date())
+        } catch let error as UsageError {
+            state = .failed(error)
         } catch {
-            self.isLoading = false
-            self.statusText = "Network Error: \(error.localizedDescription)"
+            state = .failed(.malformedResponse)
         }
     }
 }

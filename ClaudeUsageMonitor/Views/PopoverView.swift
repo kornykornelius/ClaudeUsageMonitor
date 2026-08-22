@@ -7,108 +7,14 @@ struct PopoverView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-
-                // Header
-                HStack {
-                    Image(systemName: "brain.head.profile")
-                    Text("Claude Usage Dashboard")
-                        .font(.headline)
-                    Spacer()
-                    if manager.isLoading {
-                        ProgressView().controlSize(.small)
-                    }
-                }
+                header
 
                 Divider()
 
-                if let usage = manager.usageData {
-
-                    // 1. Current 5-Hour Session Window
-                    if let fiveHour = usage.fiveHour {
-                        QuotaSectionView(
-                            title: "Current 5-Hour Session",
-                            rawUtilization: fiveHour.utilization,
-                            resetTime: fiveHour.formattedResetTime
-                        )
-                    }
-
-                    Divider()
-
-                    // 2. Weekly Quotas (7-Day Limits)
-                    Text("Weekly Quotas (7-Day Limits)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-
-                    if let sevenDay = usage.sevenDay {
-                        QuotaSectionView(
-                            title: "All Models Total",
-                            rawUtilization: sevenDay.utilization,
-                            resetTime: sevenDay.formattedResetTime
-                        )
-                    }
-
-                    if let sonnet = usage.sevenDaySonnet {
-                        QuotaSectionView(
-                            title: "Sonnet Specific",
-                            rawUtilization: sonnet.utilization,
-                            resetTime: sonnet.formattedResetTime
-                        )
-                    }
-
-                    if let opus = usage.sevenDayOpus {
-                        QuotaSectionView(
-                            title: "Opus Specific",
-                            rawUtilization: opus.utilization,
-                            resetTime: opus.formattedResetTime
-                        )
-                    }
-
-                    Divider()
-
-                    // 3. Usage Credits & Monthly Limits
-                    if let credit = usage.extraUsage, credit.isAvailable == true {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Extra Usage Credits")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
-
-                            HStack {
-                                Text("Current Balance:")
-                                Spacer()
-                                Text("$\(credit.currentBalance ?? 0.0, specifier: "%.2f")")
-                                    .bold()
-                            }
-                            .font(.subheadline)
-
-                            HStack {
-                                Text("Monthly Spend Cap:")
-                                Spacer()
-                                Text("$\(credit.monthlyLimit ?? 0.0, specifier: "%.2f")")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                            HStack {
-                                Text("Expires:")
-                                Spacer()
-                                Text(credit.formattedExpiration)
-                            }
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-                    }
-
-                } else {
-                    Text(manager.statusText)
-                        .foregroundColor(.secondary)
-                        .font(.subheadline)
-                }
+                content
 
                 Divider()
 
-                // Configuration Settings
                 CredentialsView(
                     sessionKey: $manager.sessionKey,
                     cfClearance: $manager.cfClearance,
@@ -127,9 +33,114 @@ struct PopoverView: View {
             }
             .padding(12)
         }
-        .frame(width: 300, height: 460)
+        .frame(width: 300, height: 500)
         .onAppear {
             Task { await manager.fetchUsage() }
         }
+    }
+
+    private var header: some View {
+        HStack {
+            Image(systemName: "brain.head.profile")
+            Text("Claude Usage Dashboard")
+                .font(.headline)
+            Spacer()
+            if manager.state.isBusy {
+                ProgressView().controlSize(.small)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch manager.state {
+        case .needsSetup:
+            statusText("Enter your sessionKey and Organization ID below to get started.")
+
+        case .loading:
+            statusText("Loading…")
+
+        case .loaded(let snapshot, _), .refreshing(let snapshot, _):
+            if snapshot.isEmpty {
+                statusText("No quota data was returned for this account.")
+            } else {
+                snapshotBody(snapshot)
+            }
+
+        case .failed(let error):
+            VStack(alignment: .leading, spacing: 4) {
+                Text(error.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.red)
+                Text(error.recoverySuggestion)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func snapshotBody(_ snapshot: UsageSnapshot) -> some View {
+        ForEach(QuotaGroup.allCases) { group in
+            let quotas = snapshot.quotas(in: group)
+            if !quotas.isEmpty {
+                if let heading = group.heading {
+                    Text(heading)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+                }
+                ForEach(quotas) { quota in
+                    QuotaSectionView(quota: quota)
+                }
+                Divider()
+            }
+        }
+
+        if let credits = snapshot.credits {
+            creditsBody(credits)
+        }
+    }
+
+    private func creditsBody(_ credits: UsageSnapshot.Credits) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Extra Usage Credits")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+
+            HStack {
+                Text("Current Balance:")
+                Spacer()
+                Text(credits.balance, format: .currency(code: "USD"))
+                    .bold()
+            }
+            .font(.subheadline)
+
+            HStack {
+                Text("Monthly Spend Cap:")
+                Spacer()
+                Text(credits.monthlyCap, format: .currency(code: "USD"))
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+
+            HStack {
+                Text("Expires:")
+                Spacer()
+                Text(Timestamp.medium(credits.expiresAt))
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+    }
+
+    private func statusText(_ message: String) -> some View {
+        Text(message)
+            .foregroundColor(.secondary)
+            .font(.subheadline)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

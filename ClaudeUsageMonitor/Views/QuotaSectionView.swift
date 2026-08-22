@@ -2,37 +2,37 @@ import SwiftUI
 
 // MARK: - Progress UI Component
 struct QuotaSectionView: View {
-    let title: String
-    let rawUtilization: Double
-    let resetTime: String
+    let quota: UsageSnapshot.Quota
 
-    // Convert raw API values into proper 0-100 percentage values
-    var percentage: Int {
-        if rawUtilization <= 1.0 {
-            return Int(rawUtilization * 100)
-        } else {
-            return Int(min(rawUtilization, 100))
+    private var percentage: Int { quota.percentage.value }
+
+    private var tint: Color {
+        switch percentage {
+        case 86...: .red
+        case 61...: .orange
+        default: .blue
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(title)
+                Text(quota.kind.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
                 Text("\(percentage)%")
                     .bold()
+                    .monospacedDigit()
             }
 
             ProgressView(value: Double(percentage), total: 100)
-                .tint(percentage > 85 ? .red : (percentage > 60 ? .orange : .blue))
+                .tint(tint)
 
             HStack {
                 Text("Resets:")
                 Spacer()
-                Text(resetTime)
+                Text(Timestamp.short(quota.resetsAt))
             }
             .font(.caption2)
             .foregroundColor(.secondary)
