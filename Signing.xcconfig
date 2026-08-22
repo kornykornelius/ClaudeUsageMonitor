@@ -1,0 +1,23 @@
+// Signing configuration (committed — safe to share)
+//
+// This is the base configuration the Xcode project points at. It deliberately
+// contains no account-identifying values, so the repository can be public.
+//
+// To sign with your own Apple Developer account, create a file named
+// `Config.xcconfig` next to this one:
+//
+//     echo 'DEVELOPMENT_TEAM = YOURTEAMID' > Config.xcconfig
+//
+// `Config.xcconfig` is gitignored and is picked up automatically by the
+// optional include at the bottom of this file. If you don't create it, the
+// build still works: Xcode falls back to "Sign to Run Locally", which is
+// sufficient for running the app on your own machine.
+//
+// Find your Team ID at https://developer.apple.com/account (Membership
+// Details), or in Xcode under Settings → Accounts.
+
+DEVELOPMENT_TEAM =
+
+// Optional local override. The `?` means a missing file is silently ignored,
+// so cloning and building this repo requires no setup.
+#include? "Config.xcconfig"
