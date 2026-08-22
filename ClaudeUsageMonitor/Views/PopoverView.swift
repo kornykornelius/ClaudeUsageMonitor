@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Menu Bar Popover Content
 struct PopoverView: View {
-    @ObservedObject var manager: ClaudeUsageManager
+    @Bindable var manager: UsageViewModel
 
     var body: some View {
         ScrollView {
@@ -111,6 +111,7 @@ struct PopoverView: View {
                 // Configuration Settings
                 CredentialsView(
                     sessionKey: $manager.sessionKey,
+                    cfClearance: $manager.cfClearance,
                     orgId: $manager.orgId
                 )
 

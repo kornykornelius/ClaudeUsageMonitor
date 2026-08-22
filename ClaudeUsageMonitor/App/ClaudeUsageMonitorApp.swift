@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Main SwiftUI App Entry Point
 @main
 struct ClaudeUsageMonitorApp: App {
-    @StateObject private var manager = ClaudeUsageManager()
+    @State private var manager = UsageViewModel()
 
     var body: some Scene {
         MenuBarExtra {
