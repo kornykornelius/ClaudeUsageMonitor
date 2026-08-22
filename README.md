@@ -87,16 +87,17 @@ It returns JSON. Copy the value of the `uuid` field.
    `https://claude.ai/api/organizations/<orgId>/…` — the UUID segment after
    `/organizations/` is your organization ID.
 
-### 3. `cf_clearance` — optional
+### 3. `cf_clearance` — optional, and usually unnecessary
 
-claude.ai sits behind Cloudflare. Most of the time the session cookie alone is
-enough, but when Cloudflare is actively challenging traffic the API returns a
-challenge page instead of JSON, and the app will report
-*"Blocked by Cloudflare"*. Supplying `cf_clearance` gets you past it.
+**Leave this empty unless the app tells you otherwise.**
 
-Copy it exactly like `sessionKey`, from the same cookies panel — look for the
-cookie named **`cf_clearance`**. If it isn't there, Cloudflare hasn't
-challenged you and you don't need it.
+claude.ai sits behind Cloudflare, but the app's requests pass through normally.
+This field exists only for the uncommon case where Cloudflare actively
+challenges you — under heavy load, from a VPN, or from an unusual IP address.
+You will know, because the popover will say *"Blocked by Cloudflare"*.
+
+If that happens, copy it exactly like `sessionKey`, from the same cookies
+panel — look for the cookie named **`cf_clearance`**.
 
 > **Copy it from Chrome.** A `cf_clearance` cookie is bound to the IP address
 > *and* the browser User-Agent it was issued to. The app identifies itself as
@@ -122,6 +123,31 @@ is stored in the app's preferences.
   the app stops working until you paste a fresh key.
 - Sessions expire on their own after a period of inactivity.
 - If the app reports an expired session, repeat step 1 to get a new value.
+
+## Troubleshooting
+
+| The popover says | What it means | What to do |
+| --- | --- | --- |
+| **Session Expired** | Your `sessionKey` is no longer valid — usually because you logged out of claude.ai, or the session aged out. | Copy a fresh `sessionKey` (step 1). |
+| **Invalid Organization ID** | The value isn't a well-formed UUID. | Re-copy it (step 2). It must look like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`. |
+| **Organization Not Found** | No organization with that ID is visible to this session. | Check that the `sessionKey` and `orgId` come from the *same* account. |
+| **Access Denied** | The session is valid but not allowed to read that organization's usage. | Team and Enterprise accounts may require administrator access. |
+| **Blocked by Cloudflare** | Cloudflare is challenging requests. | Supply `cf_clearance` (step 3). |
+| **claude.ai returned no quota data** | The request succeeded but your plan reports no quotas. | Not an error. Plans differ in what they report. |
+| **Offline** / **Request Timed Out** | Network problem. | The app backs off and retries automatically. |
+
+After a non-recoverable error the app **stops polling** until you change a
+credential or press Refresh — it will say so. This is deliberate: retrying an
+expired session on a timer just generates hundreds of identical failed requests
+a day.
+
+For more detail, the app logs to the unified log:
+
+```bash
+log show --predicate 'subsystem == "woeichwan.ClaudeUsageMonitor"' --last 1h --info
+```
+
+Credentials are never written to the log.
 
 ## Security
 
@@ -168,3 +194,38 @@ echo 'DEVELOPMENT_TEAM = YOURTEAMID' > Config.xcconfig
 That file is gitignored and is picked up automatically by `Signing.xcconfig`.
 Your Team ID is at <https://developer.apple.com/account> under Membership
 Details, or in Xcode under Settings → Accounts.
+
+### Development tooling
+
+There is no Xcode test target. Two scripts cover the parts that are otherwise
+awkward to verify:
+
+```bash
+./Tools/run-checks.sh          # ~50 correctness checks against the real sources
+./Tools/render-snapshots.sh    # every popover state rendered to PNG
+```
+
+Xcode previews work for all seven popover states.
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map, data flow, and the
+  types worth knowing about
+- [docs/DECISIONS.md](docs/DECISIONS.md) — why the code looks the way it does,
+  including where the first answer turned out to be wrong
+- [docs/SECURITY.md](docs/SECURITY.md) — credential handling, storage, and
+  network behaviour
+
+## Known limitations
+
+- **Sub-1% readings may display incorrectly.** The API's `utilization` field has
+  not been confirmed to be a fraction or a percentage, so the app guesses from
+  magnitude. A genuine 0.8% reading shows as 80%. See
+  [docs/DECISIONS.md](docs/DECISIONS.md).
+- **Team and Enterprise accounts are untested.** Organization-scoped endpoints
+  there may require administrator access.
+- **The endpoint is undocumented** and can change or disappear without notice.
+
+## License
+
+[MIT](LICENSE).

@@ -255,40 +255,6 @@ private struct LabeledRow: View {
 
 // MARK: - Previews
 
-private extension UsageSnapshot {
-    /// A Max-style account reporting every quota plus credits.
-    static var richSample: UsageSnapshot {
-        UsageSnapshot(
-            quotas: [
-                .init(kind: .fiveHour, percentage: Percentage(apiValue: 0.42),
-                      resetsAt: Date().addingTimeInterval(3 * 3600)),
-                .init(kind: .sevenDayAll, percentage: Percentage(apiValue: 0.17),
-                      resetsAt: Date().addingTimeInterval(4 * 86400)),
-                .init(kind: .sevenDaySonnet, percentage: Percentage(apiValue: 0.66),
-                      resetsAt: Date().addingTimeInterval(4 * 86400)),
-                .init(kind: .sevenDayOpus, percentage: Percentage(apiValue: 0.91),
-                      resetsAt: Date().addingTimeInterval(4 * 86400)),
-            ],
-            credits: .init(balance: 12.5, monthlyCap: 50, expiresAt: Date().addingTimeInterval(9 * 86400))
-        )
-    }
-
-    /// A Free/Pro-style account reporting only the session window.
-    static var sparseSample: UsageSnapshot {
-        UsageSnapshot(
-            quotas: [
-                .init(kind: .fiveHour, percentage: Percentage(apiValue: 0.08),
-                      resetsAt: Date().addingTimeInterval(1800)),
-            ],
-            credits: nil
-        )
-    }
-
-    static var emptySample: UsageSnapshot {
-        UsageSnapshot(quotas: [], credits: nil)
-    }
-}
-
 #Preview("Loaded — all quotas") {
     PopoverView(manager: .preview(.loaded(.richSample, fetchedAt: Date().addingTimeInterval(-120)),
                                   nextRefreshAt: Date().addingTimeInterval(60)))
