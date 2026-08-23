@@ -4,13 +4,12 @@ A macOS menu-bar app that shows your claude.ai usage quotas at a glance — the
 current 5-hour session window, the weekly limits, and any extra usage credits.
 No Dock icon, no window: just a percentage next to a brain icon in the menu bar.
 
-<img width="307" height="342" alt="Screenshot 2026-08-23 at 4 20 51 PM" src="https://github.com/user-attachments/assets/6eb315bc-b8df-4938-b28c-f04fe65cccf8" />
-
-
 > **Unofficial.** This app reads an undocumented claude.ai endpoint using your
 > browser session cookie. It is not affiliated with Anthropic, may break without
 > notice, and your `sessionKey` grants full access to your Claude account —
 > treat it as a password.
+
+<img width="307" height="342" alt="Screenshot 2026-08-23 at 4 20 51 PM" src="https://github.com/user-attachments/assets/6eb315bc-b8df-4938-b28c-f04fe65cccf8" />
 
 ## What it shows
 
