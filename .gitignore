@@ -18,6 +18,10 @@ Package.resolved
 # Xcode generated files
 *.xccheckout
 *.moved-aside
+*.xcarchive
+*.dSYM
+*.dSYM.zip
+*.hmap
 
 # Playgrounds
 timeline.xctimeline
@@ -35,3 +39,25 @@ Carthage/Build/
 .env.*
 Secrets.swift
 Config.xcconfig
+
+# Signing material and private keys.
+#
+# Nothing of this kind belongs in the repository. Unlike the Team ID — which
+# is public by design and appears in the signature of every shipped app —
+# these are real credentials: a .p8 App Store Connect key or an exported .p12
+# certificate lets the holder sign and publish as you.
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+
+# Local agent and editor settings.
+#
+# Machine-specific, and may record local paths or permission allowlists. This
+# was previously covered only by a global gitignore, which does not travel
+# with a clone.
+.claude/settings.local.json
